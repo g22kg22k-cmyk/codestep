@@ -64,6 +64,9 @@ GENERIC = [
     re.compile(rb"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"),                         # e-mail address
 ]
 EMAIL = GENERIC[1]
+# Domains reserved for examples (RFC 2606 / RFC 6761): an address there can never belong to a person.
+# Lessons use them to teach e-mail parsing.
+RESERVED_EXAMPLE_DOMAIN = re.compile(rb"@(?:[a-z0-9-]+\.)*(?:example\.(?:com|net|org)|example|test|invalid)$", re.I)
 # License notices must be copied word for word and include their authors' contact addresses.
 # The personal-value check (this PC's user name, home and project path) still applies to them.
 VERBATIM_NOTICES = {"THIRD_PARTY_LICENSES.txt"}
@@ -162,6 +165,8 @@ def scan(path: Path, literals):
             if regex is EMAIL and path.name in VERBATIM_NOTICES:
                 continue
             for match in regex.finditer(hay):
+                if regex is EMAIL and RESERVED_EXAMPLE_DOMAIN.search(match.group(0)):
+                    continue
                 findings.append(f"looks personal: {match.group(0)[:60]!r}")
     return findings
 

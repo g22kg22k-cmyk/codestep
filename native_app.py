@@ -3731,34 +3731,41 @@ class CodeStepApp(tk.Tk):
             return examples
         return [{"title": f"{lesson['title']} 기본 예제", "code": lesson.get("example", ""), "output": "", "note": ""}]
 
-    def _render_example_tabs(self, parent, examples, active_idx, target, bg=BG, padx_btn=10, pady_btn=4, pady_wrap=(0, 6), show_all_btn=False):
-        if len(examples) <= 1 and not show_all_btn:
+    def _render_example_tabs(self, parent, examples, active_idx, target, bg=BG, padx_btn=10, pady_btn=4, pady_wrap=(0, 6),
+                             show_all_btn=False, max_width=None):
+        """Example navigator: '예제 3 / 15', previous/next, and numbered buttons that wrap onto more rows.
+
+        Lessons have 15-20 examples, so one row of '예제 N' buttons would run off the panel.
+        """
+        total = len(examples)
+        if total <= 1 and not show_all_btn:
             return
-        tab_bar = tk.Frame(parent, bg=bg)
-        tab_bar.pack(fill="x", pady=px(pady_wrap))
-        for idx, _ in enumerate(examples):
-            btn = button(
-                tab_bar,
-                f"예제 {idx + 1}",
-                lambda i=idx, t=target: self._select_lesson_example(i, t),
-                "secondary" if idx == active_idx else "ghost",
-                pill=True,
-                padx=px(padx_btn),
-                pady=px(pady_btn),
-                font=(FONT, 8, "bold"),
-            )
-            btn.pack(side="left", padx=px((0, 5)))
-        if show_all_btn and len(examples) > 1:
-            button(
-                tab_bar,
-                "전체 보기",
-                lambda t=target: self._select_lesson_example(-1, t),
-                "secondary" if active_idx == -1 else "ghost",
-                pill=True,
-                padx=px(padx_btn),
-                pady=px(pady_btn),
-                font=(FONT, 8, "bold"),
-            ).pack(side="right")
+        wrap = tk.Frame(parent, bg=bg)
+        wrap.pack(fill="x", pady=px(pady_wrap))
+        head = tk.Frame(wrap, bg=bg)
+        head.pack(fill="x", pady=px((0, 4)))
+        current = "전체" if active_idx == -1 else f"{active_idx + 1} / {total}"
+        label(head, f"예제 {current}", 9, MUTED, True, bg=bg).pack(side="left")
+        style = dict(pill=True, padx=px(padx_btn), pady=px(pady_btn), font=(FONT, 8, "bold"))
+        if show_all_btn and total > 1:
+            button(head, "전체 보기", lambda t=target: self._select_lesson_example(-1, t),
+                   "secondary" if active_idx == -1 else "ghost", **style).pack(side="right")
+        next_btn = button(head, "다음 ▶", lambda t=target: self._select_lesson_example(0 if active_idx < 0 else min(total - 1, active_idx + 1), t),
+                          "ghost", **style)
+        next_btn.pack(side="right", padx=px((0, 5)))
+        prev_btn = button(head, "◀ 이전", lambda t=target: self._select_lesson_example(max(0, active_idx - 1), t), "ghost", **style)
+        prev_btn.pack(side="right", padx=px((0, 5)))
+        if active_idx <= 0:
+            prev_btn.configure(state="disabled")
+        if active_idx == total - 1:
+            next_btn.configure(state="disabled")
+        builders = [
+            (lambda row, i=idx: button(row, str(i + 1), lambda i=i, t=target: self._select_lesson_example(i, t),
+                                       "secondary" if i == active_idx else "ghost", pill=True, padx=px(8), pady=px(pady_btn),
+                                       font=(FONT, 8, "bold"), min_width=28))
+            for idx in range(total)
+        ]
+        _pack_chip_flow(wrap, builders, gap_x=5, gap_y=4, max_width=max_width or (520 if self.lesson_two_cols else 680), bg=bg)
 
     def _copy_snippet(self, code):
         self.clipboard_clear()
@@ -4060,7 +4067,8 @@ class CodeStepApp(tk.Tk):
                     fit_wrap(label(holder, f"· {step['title']}: {step['summary']}", 9, INK, wraplength=wrap_w - px(20))).pack(anchor="w", pady=px(1))
                     if step.get("tip"):
                         fit_wrap(label(holder, f"   TIP · {step['tip']}", 8, "#7c6c3c", wraplength=wrap_w - px(20))).pack(anchor="w", pady=px((0, 2)))
-                self._render_example_tabs(holder, examples, idx, "code", bg="#f6f9fc", padx_btn=9, pady_btn=3, pady_wrap=(5, 4))
+                self._render_example_tabs(holder, examples, idx, "code", bg="#f6f9fc", padx_btn=9, pady_btn=3, pady_wrap=(5, 4),
+                                          max_width=490 if self.lesson_two_cols else 650)
                 self._render_example_card(holder, examples[idx], wrap_w - px(20), pad_bottom=0, lang=lang)
                 self._render_pitfalls(holder, lesson, wrap_w - px(20), compact=True, bg="#f6f9fc")
                 ui["concept_slot"].grid(row=2, column=0, sticky="ew", pady=px((7, 0)))

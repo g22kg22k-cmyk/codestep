@@ -367,7 +367,18 @@ class RustExecutionSafetyTests(unittest.TestCase):
 class TerminalCommandTests(unittest.TestCase):
     def _run(self, command, cwd):
         proc = subprocess.run(command, cwd=str(cwd), capture_output=True, timeout=120)
-        return proc.stdout.decode("utf-8", "replace") + proc.stderr.decode("utf-8", "replace")
+        # The program prints UTF-8, but cmd's own echo lines follow the console code page. Without a
+        # console (e.g. tests started from Git Bash) "chcp 65001" has no effect and they come out as
+        # cp949, so each line is decoded on its own.
+        def decode(raw):
+            lines = []
+            for line in raw.splitlines():
+                try:
+                    lines.append(line.decode("utf-8"))
+                except UnicodeDecodeError:
+                    lines.append(line.decode("cp949", "replace"))
+            return "\n".join(lines)
+        return decode(proc.stdout) + "\n" + decode(proc.stderr)
 
     def test_python_terminal_command_runs_paths_with_spaces_and_symbols(self):
         # The old command list was escaped by subprocess as \"...\" which cmd.exe rejects, so the

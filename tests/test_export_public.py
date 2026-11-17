@@ -17,7 +17,7 @@ class ExportPublicTests(unittest.TestCase):
     def test_personal_details_are_detected(self):
         # Built at run time so this test file itself never contains such a value.
         user_path = "C:" + "\\Users\\" + "someone" + "\\Documents\\x.txt"
-        email = "someone" + "@" + "example.com"
+        email = "someone" + "@" + "mailhost.co.kr"  # an ordinary domain; reserved example domains are allowed
         literals = export_public.personal_patterns()
         with tempfile.TemporaryDirectory() as tmp:
             for content in (user_path, email, str(Path.home()), str(ROOT)):
@@ -28,8 +28,12 @@ class ExportPublicTests(unittest.TestCase):
             utf16.write_bytes(user_path.encode("utf-16-le"))
             self.assertTrue(export_public.scan(utf16, literals), "UTF-16 text inside binary files is checked too")
             clean = Path(tmp) / "clean.py"
-            clean.write_text('folder = "%LOCALAPPDATA%\\\\CodeStep"\nhome = "C:\\\\Users\\\\..."\n', encoding="utf-8")
-            self.assertEqual(export_public.scan(clean, literals), [])
+            reserved = "coder" + "@" + "example.com, a" + "@" + "mail.example.org"
+            clean.write_text(f'folder = "%LOCALAPPDATA%\\\\CodeStep"\nhome = "C:\\\\Users\\\\..."\nteach = "{reserved}"\n', encoding="utf-8")
+            self.assertEqual(export_public.scan(clean, literals), [], "addresses at reserved example domains are fine")
+            look_alike = Path(tmp) / "look_alike.py"
+            look_alike.write_text('x = "a' + '@' + 'example.com.evil.net"\n', encoding="utf-8")
+            self.assertTrue(export_public.scan(look_alike, literals), "only the reserved domain itself is allowed")
 
     def test_an_exe_that_cannot_be_inspected_is_blocked(self):
         with tempfile.TemporaryDirectory() as tmp:

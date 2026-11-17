@@ -56,6 +56,18 @@ class CurriculumConsistencyTests(unittest.TestCase):
                 counts[lesson["lang"]] += 1
         self.assertEqual(counts["python"] + counts["rust"], 58)
 
+    def test_every_lesson_has_rich_examples(self):
+        # Each lesson got five times its original 3-4 examples, one per function/operator and then mixed uses.
+        for lesson in LESSONS:
+            examples = lesson.get("examples") or []
+            self.assertGreaterEqual(len(examples), 15, lesson["id"])
+            titles = [e["title"] for e in examples]
+            self.assertEqual(len(titles), len(set(titles)), f"{lesson['id']}: duplicate example titles")
+            for e in examples:
+                for field in ("title", "code", "output", "note"):
+                    self.assertTrue(str(e.get(field, "")).strip(), f"{lesson['id']} / {e.get('title')}: {field}")
+        self.assertGreaterEqual(sum(len(l["examples"]) for l in LESSONS), 1515)
+
     def test_pitfalls_still_behave_as_described(self):
         # Re-runs every wrong/fixed pair through the real runners (rustc ones are skipped without rustc).
         process = subprocess.run([sys.executable, "-X", "utf8", str(ROOT / "tools" / "refresh_pitfalls.py"), "--check"],

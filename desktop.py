@@ -28,6 +28,11 @@ def main():
         return real_file_worker(sys.argv[2], sys.argv[3])
 
     import argparse
+    # A Korean console uses cp949, which cannot show every character of the help text (e.g. "—").
+    # Replace what it cannot show instead of crashing; the windowed EXE has no console at all.
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None and hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     parser = argparse.ArgumentParser(description="코드스텝 — Python · Rust 멀티 언어 코딩 학습 데스크톱")
     parser.add_argument("--data-dir", type=Path, help="학습 기록을 보관할 로컬 폴더")
     parser.add_argument("--self-test", type=Path, help=argparse.SUPPRESS)
