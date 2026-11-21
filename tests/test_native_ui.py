@@ -320,6 +320,21 @@ class NativeUiFixTests(NativeUiRegressionTests):
     test_toggle_unit_updates_in_place_without_navigate = None
     test_softbutton_configure_and_ctrl_return_guard = None
 
+    def test_code_question_starts_from_the_starter_even_if_an_old_answer_is_on_disk(self):
+        app = self._make_app()
+        app.progress["settings"]["unlockAll"] = True
+        question = learning.QUESTION_BY_ID["types-4"]
+        task = Path(app.workspace.task_dir("types-4"))
+        task.mkdir(parents=True, exist_ok=True)
+        (task / "main.py").write_text(question["solution"], encoding="utf-8")
+        app.start_lesson("types")
+        app.next_question()
+        while app.current_question()["type"] != "code":
+            app.session["feedback"] = {"correct": True, "message": ""}
+            app.next_question()
+        self.assertEqual(app.lesson_editor.get().strip(), question["starter"].strip())
+        self.assertEqual((task / "main.py").read_text(encoding="utf-8"), question["starter"])
+
     def test_clearing_results_keeps_the_other_languages_practice_file(self):
         app = self._make_app()
         app.navigate("playground")

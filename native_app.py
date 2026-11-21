@@ -3585,11 +3585,14 @@ class CodeStepApp(tk.Tk):
         task_dir = None
         script_path = None
         if question.get("type") == "code":
+            # Every attempt starts from the starter code. The file on disk may still hold an answer
+            # from an earlier attempt (it survives "학습 기록 초기화"), which would give the answer away.
             task_dir, script_path, code = self.workspace.prepare_workspace(
                 self.workspace.task_dir(question["id"]),
                 meta["filename"],
                 question.get("starter", ""),
                 fixtures=question.get("fixtures"),
+                reset_code=True,
             )
         auto_verify = self.progress["settings"].get("autoVerify", True)
         sync_status = (

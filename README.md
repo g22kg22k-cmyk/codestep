@@ -30,7 +30,7 @@
 
 ## 기록 저장
 
-진도와 설정은 `%LOCALAPPDATA%\CodeStep\progress.json`, 코드 초안은 같은 폴더의 `draft.json`에 저장합니다(기존 `%LOCALAPPDATA%\PyStep` 기록이 있으면 처음 실행 시 자동 이전됩니다). 완료하지 않은 레슨의 문제 위치는 저장하지 않습니다.
+진도와 설정은 `%LOCALAPPDATA%\CodeStep\progress.json`, 코드 초안은 같은 폴더의 `draft.json`에 저장합니다(기존 `%LOCALAPPDATA%\PyStep` 기록이 있으면 처음 실행 시 자동 이전됩니다). 완료하지 않은 레슨의 문제 위치는 저장하지 않으며, 실기 문제는 풀 때마다 처음 코드에서 시작합니다(예전에 쓴 답이 미리 보이지 않도록).
 
 이전 브라우저 버전의 기록은 해당 버전의 설정에서 내보낸 JSON 파일을 새 프로그램의 **설정 → 기록 불러오기**에서 가져올 수 있습니다.
 
