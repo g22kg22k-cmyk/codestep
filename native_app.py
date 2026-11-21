@@ -3376,7 +3376,7 @@ class CodeStepApp(tk.Tk):
         row.pack(fill="x")
         button(row, "기록 내보내기", self.export_progress, "secondary", pill=True, padx=px(13), pady=px(5)).pack(side="left", padx=px((0, 8)))
         button(row, "기록 불러오기", self.import_progress, "secondary", pill=True, padx=px(13), pady=px(5)).pack(side="left")
-        fit_wrap(label(panel, "이전 브라우저 버전에서 내보낸 JSON 기록도 불러올 수 있어요. 개인정보를 수집하지 않으며, 외부로 전송하지 않아요.", 8, MUTED, wraplength=px(760))).pack(anchor="w", pady=px((8, 0)))
+        fit_wrap(label(panel, "이전 브라우저 버전에서 내보낸 JSON 기록도 불러올 수 있어요.", 8, MUTED, wraplength=px(760))).pack(anchor="w", pady=px((8, 0)))
         panel = card(self.content, "#faf4f0", 14, border="#ebd5c9", radius=14)
         panel.pack(fill="x")
         label(panel, "처음부터 다시 시작하기", 11, "#9c725a", True).pack(anchor="w")
