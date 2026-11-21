@@ -58,6 +58,36 @@ class NativeUiRegressionTests(unittest.TestCase):
         except Exception:
             pass
 
+    def test_written_output_question_is_typed_and_graded(self):
+        app = self._make_app()
+        app.progress["settings"]["unlockAll"] = True
+        app.start_lesson("eipx-string")
+        app.next_question()
+        question = app.current_question()
+        self.assertEqual(question["type"], "output")
+        box = app.controls["output_box"]
+        self.assertEqual(str(app.controls["check"].cget("state")), "disabled", "nothing written yet")
+
+        box.insert("1.0", "FORM\nWRONG")
+        app._sync_output_answer()
+        app.check_answer()
+        feedback = app.session["feedback"]
+        self.assertFalse(feedback["correct"])
+        self.assertIn("2번째 줄", feedback["message"])
+        self.assertNotIn(question["answer"], feedback["message"], "a wrong try must not give the answer away")
+        self.assertIn(question["id"], app.progress["mistakes"])
+
+        app.reveal_solution()
+        app.update_idletasks()
+        box.delete("1.0", "end")
+        box.insert("1.0", question["answer"] + "  \n\n")
+        app._sync_output_answer()
+        app.check_answer()
+        self.assertTrue(app.session["feedback"]["correct"])
+        self.assertEqual(str(box.cget("state")), "disabled")
+        self.assertEqual(app._handle_ctrl_enter(), "break")
+        self.assertEqual(app.session["index"], 1)
+
     def test_choice_and_hint_update_in_place_without_render_lesson(self):
         app = self._make_app()
         lesson_id = learning.UNITS[0]["lessons"][0]["id"]

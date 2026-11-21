@@ -108,6 +108,9 @@ def run_checks(report_path, data_dir=None):
                         index = next(i for i, value in enumerate(question["tokens"]) if value == token and i not in used)
                         used.add(index)
                         app.controls["tokens"][index].invoke()
+                elif question["type"] == "output":
+                    app.controls["output_box"].insert("1.0", question["answer"])
+                    app._sync_output_answer()
                 elif via_external_file:
                     # Simulate external Python editor (IDLE/VS Code) modifying main.py on disk
                     write_text_safe(app.session["scriptPath"], question["solution"])

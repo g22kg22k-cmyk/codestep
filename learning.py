@@ -101,6 +101,26 @@ def normalize_progress(value):
     return clean
 
 
+def compare_written_output(typed, answer):
+    """Grade an output the learner wrote by hand: None if it matches, else the first differing line (1-based).
+
+    Spaces at the end of a line and blank lines at the very end cannot be seen on an answer sheet, so
+    they are ignored. Everything else (quotes, brackets, spaces between values) must match.
+    """
+    def clean(text):
+        lines = [line.rstrip() for line in str(text).replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+        while lines and not lines[-1]:
+            lines.pop()
+        return lines
+    mine, goal = clean(typed), clean(answer)
+    if mine == goal:
+        return None
+    for number, (written, wanted) in enumerate(zip(mine, goal), 1):
+        if written != wanted:
+            return number
+    return min(len(mine), len(goal)) + 1
+
+
 def is_unlocked(progress, lesson_id):
     lesson = LESSON_BY_ID.get(lesson_id)
     if not lesson:

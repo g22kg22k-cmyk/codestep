@@ -134,7 +134,7 @@ class LearningTests(unittest.TestCase):
                 self.assertTrue(bmap["러스트 입문 마스터"])
 
     def test_tiered_curriculum_unlocks_and_badges(self):
-        self.assertEqual((len(UNITS), len(LESSONS), len(QUESTIONS), len(SAMPLES)), (38, 98, 424, 20))
+        self.assertEqual((len(UNITS), len(LESSONS), len(QUESTIONS), len(SAMPLES)), (41, 114, 592, 20))
         progress = fresh_progress()
         self.assertFalse(is_unlocked(progress, "numbers"))
         for entry_id in (

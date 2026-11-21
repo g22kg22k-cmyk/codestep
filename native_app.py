@@ -21,7 +21,7 @@ import wave
 
 from code_executor import run_repl_command, run_workspace_script
 from learning import (UNITS, LESSONS, QUESTIONS, SAMPLES, LESSON_BY_ID, QUESTION_BY_ID, LANGS, LEVELS,
-                      ProgressStore, activity_today, add_activity, badges, finish_lesson,
+                      ProgressStore, activity_today, add_activity, badges, compare_written_output, finish_lesson,
                       is_unlocked, next_lesson, streak)
 from python_bridge import (WorkspaceManager, discover_editors, discover_python_runtime,
                            discover_rust_runtime, discover_setup_status, get_setup_catalog,
@@ -202,7 +202,7 @@ ROUTES = [
     ("achievements", "☆", "나의 성취"),
     ("settings", "⚙", "설정"),
 ]
-TYPE_NAMES = {"choice": "알맞은 답 고르기", "fill": "빈칸 채우기", "order": "코드 순서 맞추기", "code": "실제 코드 작성 실기"}
+TYPE_NAMES = {"choice": "알맞은 답 고르기", "fill": "빈칸 채우기", "order": "코드 순서 맞추기", "code": "실제 코드 작성 실기", "output": "실행 결과 직접 쓰기"}
 
 
 def _route_colors(route):
@@ -3598,7 +3598,7 @@ class CodeStepApp(tk.Tk):
             else f"● 파일 감시 중 (수동 채점 모드) — 저장 시 코드가 반영되며 아래 '정답 확인'으로 채점해요"
         )
         session.update(
-            selected=None, options=options, order=[], bank=bank, code=code,
+            selected=None, options=options, order=[], bank=bank, code=code, typed="",
             taskDir=task_dir, scriptPath=script_path,
             feedback={}, result=None, hint=False, revealed=False, running=False,
             exampleIdx=0, conceptOpen=False,
@@ -3678,7 +3678,9 @@ class CodeStepApp(tk.Tk):
         fit_wrap(label(left_pane, question["prompt"], 14, INK, True, wraplength=wrap_w)).pack(anchor="w", pady=px((6, 8)))
         if question.get("code") and question["type"] != "code":
             snippet = question["code"].replace("___", str(session["selected"])) if question["type"] == "fill" and session["selected"] is not None else question["code"]
-            fill_box = code_block(left_pane, snippet, True, lang=lang)
+            # Tracing needs the whole program on screen, so written-output questions are never cut off.
+            full_height = len(snippet.splitlines()) if question["type"] == "output" else None
+            fill_box = code_block(left_pane, snippet, True, height=full_height, lang=lang)
             fill_box.pack(fill="x", pady=px((0, 8)))
             if question["type"] == "fill":
                 self.controls["fill_code"] = (fill_box, question["code"])
@@ -3692,6 +3694,12 @@ class CodeStepApp(tk.Tk):
         elif question["type"] == "order":
             self.watch_state = None
             self._answer_order(left_pane, question, locked)
+            self.lesson_ref_frame = tk.Frame(right_pane, bg=BG)
+            self.lesson_ref_frame.pack(fill="x")
+            self._render_lesson_reference_pane(question)
+        elif question["type"] == "output":
+            self.watch_state = None
+            self._answer_output(left_pane, question, locked)
             self.lesson_ref_frame = tk.Frame(right_pane, bg=BG)
             self.lesson_ref_frame.pack(fill="x")
             self._render_lesson_reference_pane(question)
@@ -3713,6 +3721,8 @@ class CodeStepApp(tk.Tk):
             ready = session["selected"] is not None
         elif question["type"] == "order":
             ready = len(session["order"]) == len(question["tokens"])
+        elif question["type"] == "output":
+            ready = bool(session["typed"].strip())
         else:
             ready = True
         self.controls["footer_hint"] = label(footer, "하트가 없어도 계속 연습할 수 있어요." if session["hearts"] == 0 else "천천히 생각해도 괜찮아요.", 9, MUTED)
@@ -3937,11 +3947,13 @@ class CodeStepApp(tk.Tk):
                 fit_wrap(label(info, lesson["body"], 9, INK, wraplength=wrap_w - px(28))).pack(anchor="w", pady=px((4, 0)))
         ver_str = self.rust_runtime.get("version") or "rustc" if lang == "rust" else self.runtime.get("version") or sys.version.split()[0]
         if question["type"] == "order":
-            tip_line = f"· 조각 클릭: 순서 추가   · 위 조각 클릭: 되돌리기\n· Ctrl+Enter: 정답 확인/이동 · 4번은 {meta['filename']} 실기 문제!"
+            tip_line = f"· 조각 클릭: 순서 추가   · 위 조각 클릭: 되돌리기\n· Ctrl+Enter: 정답 확인/이동 · 마지막은 {meta['filename']} 실기 문제!"
+        elif question["type"] == "output":
+            tip_line = "· 실행하지 말고 손으로 따라가 결과를 적어요\n· Ctrl+Enter: 채점/이동 · 줄바꿈·따옴표까지 똑같이!"
         elif question["type"] == "code":
             tip_line = f"· Tab: 공백 4칸   · Ctrl+Enter: 실행·검증\n· {meta['filename']} 저장 시 앱이 변경을 즉시 인식해요!"
         else:
-            tip_line = f"· 숫자 키 1~4: 보기 선택   · Ctrl+Enter: 채점/이동\n· 마지막 4번은 실제 {meta['name']}({meta['filename']}) 실기 문제!"
+            tip_line = f"· 숫자 키 1~4: 보기 선택   · Ctrl+Enter: 채점/이동\n· 마지막은 실제 {meta['name']}({meta['filename']}) 실기 문제!"
         tip_entries = [
             ("dim", f"{meta['name']} {ver_str} · 학습 가이드\n"),
             ("prompt", "TIP> "),
@@ -4028,8 +4040,10 @@ class CodeStepApp(tk.Tk):
         elif ui["concept_btn"].winfo_manager():
             ui["concept_btn"].pack_forget()
 
-        show_reveal = bool(session["feedback"] and not session["feedback"].get("correct") and question["type"] == "code")
+        written = question["type"] == "output"
+        show_reveal = bool(session["feedback"] and not session["feedback"].get("correct") and question["type"] in ("code", "output"))
         if show_reveal:
+            ui["reveal_btn"].configure(text="정답 출력 보기" if written else "예시 답안 보기")
             if not ui["reveal_btn"].winfo_manager():
                 ui["reveal_btn"].pack(side="left", padx=px(6))
         elif ui["reveal_btn"].winfo_manager():
@@ -4083,18 +4097,19 @@ class CodeStepApp(tk.Tk):
             if session["revealed"]:
                 sol_hdr = tk.Frame(ui["solution_slot"], bg=BG)
                 sol_hdr.pack(fill="x", pady=px((0, 2)))
-                label(sol_hdr, "💡 예시 답안", 9, meta["accent"], True).pack(side="left")
+                shown_answer = question["answer"] if written else question["solution"]
+                label(sol_hdr, "💡 정답 출력" if written else "💡 예시 답안", 9, meta["accent"], True).pack(side="left")
                 button(
                     sol_hdr,
                     "답안 복사",
-                    lambda s=question["solution"]: (self.clipboard_clear(), self.clipboard_append(s), self.toast("예시 답안을 클립보드에 복사했어요.")),
+                    lambda s=shown_answer: (self.clipboard_clear(), self.clipboard_append(s), self.toast("답안을 클립보드에 복사했어요.")),
                     "ghost",
                     pill=True,
                     padx=px(9),
                     pady=px(2),
                     font=(FONT, 8, "bold"),
                 ).pack(side="right")
-                code_block(ui["solution_slot"], question["solution"], True, lang=lang).pack(fill="x")
+                code_block(ui["solution_slot"], shown_answer, True, lang=lang).pack(fill="x")
                 ui["solution_slot"].grid(row=3, column=0, sticky="ew", pady=px((7, 0)))
             else:
                 ui["solution_slot"].grid_remove()
@@ -4262,6 +4277,34 @@ class CodeStepApp(tk.Tk):
         start = button(footer, "문제 풀기 (Ctrl+Enter)  →", self.next_question, pill=True, padx=px(18), pady=px(7))
         start.pack(side="right")
         self.controls["check"] = start
+
+    def _answer_output(self, body, question, locked):
+        """The exam's own format: read the program, work out the result by hand and write it down."""
+        label(body, "실행 결과 쓰기 (줄바꿈·띄어쓰기·따옴표까지 그대로)", 9, MUTED, True).pack(anchor="w", pady=px((2, 4)))
+        shell = RoundedFrame(body, bg=WHITE, padx=12, pady=8, border=LINE, radius=11)
+        shell.pack(fill="x")
+        box = tk.Text(shell, height=6, wrap="none", bg=WHITE, fg=INK, insertbackground=INK, font=(CODE_FONT, 11),
+                      relief="flat", bd=0, padx=0, pady=0, spacing1=2, spacing3=2, highlightthickness=0, undo=True)
+        box.pack(fill="x")
+        box.insert("1.0", self.session["typed"])
+        box.bind("<KeyRelease>", self._sync_output_answer)
+        box.bind("<<Paste>>", lambda _e: self.after_idle(self._sync_output_answer))
+        for sequence in ("<Control-Return>", "<Control-KP_Enter>"):
+            box.bind(sequence, self._handle_ctrl_enter)
+        self.controls["output_box"] = box
+        if locked:
+            box.configure(state="disabled")
+        else:
+            self.after_idle(lambda: box.winfo_exists() and box.focus_set())
+
+    def _sync_output_answer(self, _=None):
+        session = self.session
+        box = self.controls.get("output_box")
+        if not session or not box or not box.winfo_exists():
+            return
+        session["typed"] = box.get("1.0", "end-1c")
+        if not session["feedback"].get("correct"):
+            self._update_check_button(bool(session["typed"].strip()))
 
     def _answer_choices(self, body, question, locked):
         self.controls["choices"] = {}
@@ -4752,6 +4795,16 @@ class CodeStepApp(tk.Tk):
             if len(session["order"]) != len(question["tokens"]):
                 return
             correct = [question["tokens"][index] for index in session["order"]] == question["answer"]
+        elif question["type"] == "output":
+            self._sync_output_answer()
+            if not session["typed"].strip():
+                return
+            line = compare_written_output(session["typed"], question["answer"])
+            if line is not None:
+                self.grade_answer(False, f"{line}번째 줄이 달라요. 변수 값을 종이에 적으면서 코드를 한 줄씩 다시 따라가 보세요. "
+                                         "리스트의 대괄호, 문자열의 따옴표, 값 사이의 띄어쓰기도 실제 출력과 똑같아야 해요.")
+                return
+            correct = True
         else:
             if session["selected"] is None:
                 return
@@ -4790,6 +4843,10 @@ class CodeStepApp(tk.Tk):
                 self.lesson_editor.text.configure(state="disabled")
         elif question["type"] == "order":
             self._sync_order_ui(question, locked=bool(correct))
+        elif question["type"] == "output":
+            box = self.controls.get("output_box")
+            if correct and box and box.winfo_exists():
+                box.configure(state="disabled")
         else:
             self._sync_choice_buttons(locked=bool(correct))
         if session["mode"] == "lesson" and self.controls.get("hearts") and self.controls["hearts"].winfo_exists():

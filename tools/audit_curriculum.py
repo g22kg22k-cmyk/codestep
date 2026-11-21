@@ -107,6 +107,9 @@ if ONLY in ("all", "structure"):
                 issue("order-token-mismatch", qid, f"tokens={q.get('tokens')!r} answer={q.get('answer')!r}")
             if q.get("tokens") == q.get("answer") and len(q.get("tokens", [])) < 2:
                 issue("order-trivial", qid, "")
+        elif q["type"] == "output":
+            if not str(q.get("code", "")).strip() or not str(q.get("answer", "")).strip():
+                issue("output-missing-field", qid, "code and answer are both required")
         elif q["type"] == "code":
             for field in ("starter", "solution"):
                 if not str(q.get(field, "")).strip():
@@ -176,6 +179,18 @@ if ONLY in ("all", "code", "code-python", "code-rust"):
             issue("starter-already-passes", qid, "the untouched starter code is graded as correct")
         if n % 10 == 0:
             print(f"  code {n}/{len(code_qs)}  ({time.time() - started:.0f}s)", flush=True)
+
+# ---------- written-output questions ----------
+if ONLY in ("all", "code", "code-python"):
+    print("== written-output questions: the answer must be what the program really prints ==", flush=True)
+    for q in QUESTIONS:
+        if q["type"] != "output":
+            continue
+        res = run_code(q.get("lang", "python"), q["code"])
+        if not res.get("ok"):
+            issue("output-question-error", q["id"], f"{res.get('error')}")
+        elif norm(res.get("output")) != norm(q["answer"]):
+            issue("output-answer-mismatch", q["id"], f"answer={norm(q['answer'])!r} actual={norm(res.get('output'))!r}")
 
 # ---------- lesson examples ----------
 if ONLY in ("all", "examples", "examples-python", "examples-rust"):

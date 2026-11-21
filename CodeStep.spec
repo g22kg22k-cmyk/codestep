@@ -17,7 +17,10 @@ a = Analysis(
         (str(project / "THIRD_PARTY_LICENSES.txt"), "."),
         (str(project / "runner.py"), "."),
     ],
-    hiddenimports=["tkinter", "_tkinter", "math", "csv", "statistics", "decimal", "fractions", "random", "json", "datetime", "pathlib", "re", "collections", "itertools", "functools", "string"],
+    hiddenimports=["tkinter", "_tkinter", "math", "csv", "statistics", "decimal", "fractions", "random", "json", "datetime", "pathlib", "re", "collections", "itertools", "functools", "string",
+                   # Modules the lessons import: the EXE's built-in Python only has what is listed or used here.
+                   "heapq", "bisect", "copy", "io", "os", "sys", "operator", "textwrap", "struct",
+                   "hashlib", "hmac", "base64", "binascii", "secrets", "ipaddress", "html", "urllib.parse"],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

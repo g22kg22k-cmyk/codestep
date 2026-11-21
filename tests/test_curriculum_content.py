@@ -10,7 +10,8 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from learning import LESSON_BY_ID, LESSONS, QUESTION_BY_ID, QUESTIONS, UNITS, finish_lesson, fresh_progress, is_unlocked  # noqa: E402
+from learning import (LESSON_BY_ID, LESSONS, QUESTION_BY_ID, QUESTIONS, UNITS, compare_written_output, finish_lesson,  # noqa: E402
+                      fresh_progress, is_unlocked)
 
 
 class CurriculumConsistencyTests(unittest.TestCase):
@@ -67,6 +68,35 @@ class CurriculumConsistencyTests(unittest.TestCase):
                 for field in ("title", "code", "output", "note"):
                     self.assertTrue(str(e.get(field, "")).strip(), f"{lesson['id']} / {e.get('title')}: {field}")
         self.assertGreaterEqual(sum(len(l["examples"]) for l in LESSONS), 1515)
+
+    def test_written_output_is_graded_like_an_answer_sheet(self):
+        self.assertIsNone(compare_written_output("a  \r\n\nb\n\n", "a\n\nb"), "invisible trailing spaces and blank lines are ignored")
+        self.assertEqual(compare_written_output("a\nc", "a\nb"), 2)
+        self.assertEqual(compare_written_output("a", "a\nb"), 2, "a missing line is reported where it should start")
+        self.assertEqual(compare_written_output("a\nb\nc", "a\nb"), 3)
+        self.assertEqual(compare_written_output("[1,2]", "[1, 2]"), 1, "spaces between values count")
+
+    def test_certificate_exam_units_practise_the_written_format(self):
+        expected = {"exam-eip-trace": 5, "exam-eip-calc": 4, "exam-sec-lab": 7}
+        units = {unit["id"]: unit for unit in UNITS}
+        for unit_id, lesson_count in expected.items():
+            unit = units[unit_id]
+            self.assertEqual((unit["lang"], unit["level"], len(unit["lessons"])), ("python", "exam", lesson_count))
+            for lesson in unit["lessons"]:
+                written = [q for q in lesson["questions"] if q["type"] == "output"]
+                self.assertGreaterEqual(len(written), 6, lesson["id"])
+                self.assertEqual(lesson["questions"][-1]["type"], "code", lesson["id"])
+        self.assertIn("실제 기출을 옮긴 것이 아니라", LESSON_BY_ID["eipx-string"]["body"])
+        self.assertIn("코드를 쓰는 시험이 아니에요", LESSON_BY_ID["secx-perm"]["body"])
+
+    def test_written_output_answers_are_what_the_programs_print(self):
+        for question in QUESTIONS:
+            if question["type"] != "output":
+                continue
+            process = subprocess.run([sys.executable, "-X", "utf8", "-c", question["code"]], capture_output=True, text=True,
+                                     encoding="utf-8", timeout=30, cwd=str(ROOT))
+            self.assertEqual(process.returncode, 0, question["id"] + process.stderr[-500:])
+            self.assertIsNone(compare_written_output(process.stdout, question["answer"]), question["id"])
 
     def test_pitfalls_still_behave_as_described(self):
         # Re-runs every wrong/fixed pair through the real runners (rustc ones are skipped without rustc).
